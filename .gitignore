@@ -4,3 +4,6 @@ README.md
 .gitignore
 camera_node/__pycache__
 server_node/__pycache__
+camera.log
+pending.txt
+server.log

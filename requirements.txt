@@ -2,7 +2,8 @@ aiortc
 aiohttp
 av
 fastapi
+nicegui
 numpy
 opencv-python-headless
-PyQt5
 uvicorn
+ultralytics

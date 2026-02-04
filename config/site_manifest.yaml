@@ -1,0 +1,32 @@
+site_name: "FOB_SENTINEL_ALPHA"
+center_coordinates: [30.2672, -97.7431] # Lat, Lon
+
+assets:
+  - id: "CAM_01_NORTH_GATE"
+    type: "sensor.camera"
+    connection:
+      ip: "0.0.0.0"
+      stream_path: "/video_feed"
+      protocol: "webrtc"
+    spatial:
+      lat: 30.2675
+      lon: -97.7435
+      floor: 0                  # 0 = Ground, 1 = 2nd Floor
+      heading: 45               # Degrees (0 is North). "Azimuth"
+      fov: 90                   # Field of View width in degrees
+      range_meters: 50          # Estimated effective visual range
+    tags: ["outdoor", "perimeter", "entry_point"]
+    
+  - id: "CAM_02_SERVER_ROOM"
+    type: "sensor.camera"
+    connection:
+      ip: "0.0.0.0"
+      stream_path: "/video_feed"
+    spatial:
+      lat: 30.2673
+      lon: -97.7432
+      floor: 1
+      heading: 180
+      fov: 60
+      range_meters: 15
+    tags: ["indoor", "secure", "high_value"]
