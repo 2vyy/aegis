@@ -3,6 +3,7 @@ WebRTC video receiver with leaky bucket pattern.
 
 Handles receiving video frames from camera nodes via WebRTC.
 Uses a leaky bucket to prevent buffer bloat and minimize latency.
+Integrates HLS Recording for 24/7 playback.
 """
 import asyncio
 import time
@@ -14,6 +15,7 @@ from av import VideoFrame
 from fastapi import FastAPI, Request
 
 from server_node.core.frame_processor import FrameProcessor
+from server_node.core.hls_recorder import HLSRecorder
 
 logger = logging.getLogger("webrtc")
 
@@ -31,6 +33,9 @@ pcs = set()
 app = FastAPI()
 
 
+# Track active receivers for cleanup
+active_receivers = set()
+
 class VideoReceiver:
     """
     Handles receiving and processing video frames from a WebRTC track.
@@ -40,7 +45,19 @@ class VideoReceiver:
         self.track = track
         self.camera_id = camera_id
         self.processor = FrameProcessor(camera_id)
+        
+        # HLS Recorder (320x240 matches config.py Camera defaults)
+        self.recorder = HLSRecorder(str(camera_id), width=320, height=240)
+        self.recorder.start()
+        
         self.frame_count = 0
+        self.running = True
+
+    def stop(self):
+        """Stops the receiver loop and recorder."""
+        self.running = False
+        self.recorder.stop()
+        logger.info(f"Stopped receiver for camera {self.camera_id}")
 
     async def _drain_buffer(self) -> VideoFrame:
         """
@@ -70,34 +87,54 @@ class VideoReceiver:
         throttle_rate = 1
         frame_count = 0
         
-        while True:
-            try:
-                recv_start = time.time()
-                frame = await self._drain_buffer()
-                recv_end = time.time()
-                
-                img = frame.to_ndarray(format="bgr24")
-                frame_count += 1
+        try:
+            while self.running:
+                try:
+                    recv_start = time.time()
+                    # Add timeout to allow checking self.running periodically if stream hangs
+                    frame = await asyncio.wait_for(self._drain_buffer(), timeout=1.0) 
+                    recv_end = time.time()
+                    
+                    img = frame.to_ndarray(format="bgr24")
+                    frame_count += 1
 
-                if frame_count % 30 == 0:
-                    recv_latency = (recv_end - recv_start) * 1000
-                    logger.info(f"[PROFILE] Frame {frame_count} drain took {recv_latency:.1f}ms")
+                    if frame_count % 30 == 0:
+                        recv_latency = (recv_end - recv_start) * 1000
+                        logger.info(f"[PROFILE] Frame {frame_count} drain took {recv_latency:.1f}ms")
 
-                # Always process frames through YOLO pipeline
-                if frame_count % throttle_rate == 0:
-                    output_frame = self.processor.process(img.copy())
-                else:
-                    output_frame = img
+                    # 1. HLS Recording (Push Clean Frame)
+                    self.recorder.push_frame(img)
 
-                # Atomic update
-                with frame_lock:
-                    latest_frames[self.camera_id] = output_frame
+                    # 2. YOLO AI Processor
+                    if frame_count % throttle_rate == 0:
+                        output_frame = self.processor.process(img.copy())
+                    else:
+                        output_frame = img
 
-            except Exception as e:
-                logger.error("Track ended or error for camera %s: %s", self.camera_id, e)
-                connected_cameras.discard(self.camera_id)
-                break
+                    # 3. Atomic Web UI Update
+                    with frame_lock:
+                        latest_frames[self.camera_id] = output_frame
 
+                except asyncio.TimeoutError:
+                    continue # Check self.running and retry
+                except Exception as e:
+                    logger.error("Track error for camera %s: %s", self.camera_id, e)
+                    break
+        finally:
+            self.stop()
+            connected_cameras.discard(self.camera_id)
+            active_receivers.discard(self)
+
+
+async def cleanup():
+    """Global cleanup function to stop all receivers."""
+    logger.info(f"Cleaning up {len(active_receivers)} active receivers...")
+    for receiver in list(active_receivers):
+        receiver.stop()
+    # Close PeerConnections
+    routines = [pc.close() for pc in pcs]
+    await asyncio.gather(*routines)
+    pcs.clear()
 
 @app.post("/offer")
 async def offer(request: Request):
@@ -118,6 +155,7 @@ async def offer(request: Request):
         if track.kind == "video":
             connected_cameras.add(camera_id)
             receiver = VideoReceiver(track, camera_id)
+            active_receivers.add(receiver)
             asyncio.ensure_future(receiver.run())
 
     @pc.on("connectionstatechange")

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Sentinel Startup Script
+# Startup Script
 # Usage: ./run.sh [--camera] [--headless]
 
 START_CAMERA=false
@@ -28,7 +28,7 @@ cleanup_ports() {
 
 cleanup() {
     echo ""
-    echo "🛑 Shutting down Sentinel..."
+    echo "🛑 Shutting down Aegis..."
     
     # Kill the Camera Node if it's running
     if [ -n "$CAMERA_PID" ]; then
@@ -50,7 +50,7 @@ if [ "$START_CAMERA" = true ]; then
 fi
 
 # 4. Start Server Node
-echo "🖥️  Starting Sentinel Server Node..."
+echo "🖥️  Starting Aegis Server Node..."
 echo "   - WebRTC Signaling on port 8000"
 
 if [ "$HEADLESS" = true ]; then

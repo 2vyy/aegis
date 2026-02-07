@@ -7,6 +7,16 @@ import os
 logger = logging.getLogger("asset_manager")
 
 @dataclass
+class MapConfig:
+    id: str
+    name: str
+    type: str # 'geospatial' or 'image'
+    center: List[float]
+    zoom: int
+    image_url: str = ""
+    bounds: List[List[float]] = field(default_factory=list)
+
+@dataclass
 class CameraAsset:
     id: str
     ip: str
@@ -15,6 +25,7 @@ class CameraAsset:
     heading: int
     fov: int
     tags: List[str]
+    map_id: str = "global"
     status: str = "OFFLINE"
     detection_count: int = 0
     
@@ -24,6 +35,8 @@ class CameraAsset:
 class AssetManager:
     def __init__(self, manifest_path="config/site_manifest.yaml"):
         self.assets: Dict[str, CameraAsset] = {}
+        self.maps: Dict[str, MapConfig] = {}
+        
         # Ensure path is absolute or correct relative to execution
         if not os.path.exists(manifest_path):
             # Try finding it relative to project root if run from module
@@ -45,6 +58,32 @@ class AssetManager:
                 self.center_coordinates = data.get('center_coordinates', [30.2672, -97.7431])
                 self.site_name = data.get('site_name', 'UNKNOWN_SITE')
                 
+                # Load Maps
+                for m in data.get('maps', []):
+                    self.maps[m['id']] = MapConfig(
+                        id=m['id'],
+                        name=m['name'],
+                        type=m['type'],
+                        center=m.get('center', self.center_coordinates),
+                        zoom=m.get('zoom', 18),
+                        image_url=m.get('image_url', ''),
+                        bounds=m.get('bounds', [])
+                    )
+                
+                # Default map if none defined
+                if not self.maps:
+                    self.maps['global'] = MapConfig(
+                        id='global',
+                        name='Global Satellite',
+                        type='geospatial',
+                        center=self.center_coordinates,
+                        zoom=18
+                    )
+
+                # Configure Notifications
+                from server_node.core.notifications import notification_manager
+                notification_manager.configure(data)
+                
                 for item in data.get('assets', []):
                     # Parse YAML into Python Objects
                     # Map 'spatial' dict to flat attributes
@@ -58,7 +97,8 @@ class AssetManager:
                         lon=spatial.get('lon', 0.0),
                         heading=spatial.get('heading', 0),
                         fov=spatial.get('fov', 60),
-                        tags=item.get('tags', [])
+                        tags=item.get('tags', []),
+                        map_id=item.get('map_id', 'global')
                     )
             logger.info(f"Loaded {len(self.assets)} assets from {self.manifest_path}")
         except Exception as e:

@@ -7,3 +7,4 @@ numpy
 opencv-python-headless
 uvicorn
 ultralytics
+deep-sort-realtime>=1.3.2

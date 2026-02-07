@@ -1,72 +1,85 @@
-# Sentinel: Distributed Tactical ISTAR Platform
+# Aegis: Distributed Real-Time Monitoring Platform
 
-**A distributed Command & Control (C2) node for real-time situational awareness in bandwidth-constrained edge environments.**
+**A distributed microservices system for real-time operational visibility in bandwidth-constrained edge environments.**
 
-## Mission Statement
+## Overview
 
-**Sentinel** is a modular surveillance architecture designed to bridge the gap between commercial IoT hardware and military-grade Command & Control (C2) systems. Unlike traditional security dashboards, Sentinel is built for **DDIL** (Denied, Disrupted, Intermittent, Limited) environments, decoupling **Perception** (Edge Nodes) from **Cognition** (C2 Server).
+**Aegis** (repo: `sentinel`) is a modular monitoring architecture designed to bridge the gap between commercial IoT hardware and enterprise-grade centralized systems. Built for **resilience in unstable network conditions**, it decouples **Perception** (Edge Nodes) from **Cognition** (Central Server) to ensure continuous operation.
 
-It enables sub-200ms video streaming, edge-computed Automated Target Recognition (ATR), and seamless interoperability with tactical networks via **Cursor-on-Target (CoT)**.
+It enables sub-200ms video streaming, edge-computed Automated Object Recognition, and seamless data aggregation. Aegis is designed for industrial safety, remote infrastructure monitoring, and high-availability observational contexts.
 
 ---
 
 ## System Architecture
 
-Sentinel utilizes a **Split-Plane Architecture** to optimize network throughput. 
-* **Data Plane (UDP):** High-volume video traffic uses WebRTC to prevent head-of-line blocking.
+Aegis utilizes a **Split-Plane Architecture** to optimize network throughput. 
+* **Data Plane (UDP):** High-volume video traffic uses WebRTC to minimize latency.
 * **Control Plane (TCP):** Critical telemetry and hardware commands use reliable REST/WebSockets.
 
 ```mermaid
 graph TD
-    subgraph Edge_Sector [Edge Sector / Forward Operating Base]
+    subgraph Edge_Site [Edge Device / Camera Node]
         Cam[Sensor Node] --> |Raw Video| Encoder[WebRTC Encoder]
-        Encoder --> |UDP Stream < 200ms| Net{Network / DDIL Layer}
+        Encoder --> |UDP Stream < 200ms| Net{Network Layer}
         Agent[Edge Agent] --> |Heartbeat & Telemetry| Net
     end
 
-    subgraph C2_Station [Command & Control Server]
+    subgraph Central_Server [Central Monitoring Server]
         Net --> |Ingest| Receiver[WebRTC Receiver]
         Net <--> |Signaling| API[FastAPI Control Plane]
         Receiver --> |Frames| AI[Inference Engine]
+        Receiver --> |HLS Stream| Record[HLS Recorder]
         
-        subgraph Intelligence_Stack
-            AI --> Motion[Motion Gating]
-            Motion --> YOLO[YOLOv8 ATR]
-            YOLO --> Track[DeepSORT Tracker]
+        subgraph Analytics_Stack
+            AI --> YOLO[YOLOv8 Detection]
+            YOLO --> Log[Event Logger]
+            Log --> DB[(SQLite Database)]
         end
         
-        Track --> |GeoJSON| GUI[Common Operational Picture]
-        Track --> |CoT XML| Gateway[CoT Gateway]
+        Log --> |Webhooks| Notify[Notification Service]
+        DB --> |History API| GUI[Dashboard]
+        YOLO --> |Live Metadata| GUI
     end
 
-    subgraph External [Tactical Network]
-        Gateway -.-> |Multicast UDP| ATAK[ATAK / CivTAK Clients]
+    subgraph External [External Systems]
+        Gateway -.-> |Multicast UDP| ATAK[ATAK / Mobile Clients]
     end
 
     %% Styling
-    style Edge_Sector fill:#2d3436,stroke:#dfe6e9,color:#fff
-    style C2_Station fill:#0984e3,stroke:#74b9ff,color:#fff
-    style External fill:#00b894,stroke:#55efc4,color:#fff
+    style Edge_Site fill:#2d3436,stroke:#dfe6e9,color:#fff
+    style Central_Server fill:#0984e3,stroke:#74b9ff,color:#fff
 ```
 
 ## Key Capabilities
 
-### 1. "Silent Watch" (DDIL Resilience)
-When network connectivity is lost (`Connection State: failed`), the Edge Node automatically enters **Silent Watch** mode.
--   **Behavior**: It continues to sample the sensor locally, running lightweight background subtraction algorithms.
--   **Buffering**: Significant motion events (>5% change) are logged to a secure on-device buffer (`pending.txt`).
--   **Sync**: (Future Roadmap) Logs are replayed to the C2 server upon reconnection.
+### 1. Resilient "Watch" State Machine
+When network connectivity is lost, the Edge Node automatically enters **Offline Recording** mode.
+-   **Behavior**: Continues sampling locally and ensuring data continuity.
+-   **Buffering**: Critical events are logged to a secure on-device buffer.
+-   **Sync**: Logs are automatically resynchronized with the server upon reconnection.
 
-### 2. "Digital Twin" Asset Management
-The entire operational environment is defined in `config/site_manifest.yaml`, serving as the **Single Source of Truth**.
--   **Schema**: Defines Assets (Cameras), Spatial Data (Lat/Lon/Heading/FOV), and Network parameters.
--   **Architecture**: The backend `AssetManager` parses this manifest to generate the map's geofences and sensor cones dynamically.
+### 2. Multi-Context Visualization
+Switch seamlessly between **Global Overview** maps and high-fidelity **Indoor Floorplans** using a dynamic tile engine.
+-   **Custom Maps**: Define map layers (Satellite, Blueprint, Drone Orthomosaic) in configuration.
+-   **Contextual Assets**: Cameras appear only on relevant map layers (e.g., specific floors or zones).
+-   **Live Symbology**: FOV cones provide immediate visual feedback on asset health and activity.
 
-### 3. Tactical Symbology
-The C2 Dashboard visualizes threats using standard tactical cues:
--   **Blue Cone**: Sector Secure (Idle).
--   **Red Pulse**: Threat Detected (YOLOv8 Identification).
--   **FOV Representation**: Cones accurately reflect the sensor's physical Field of View and Orientation.
+### 3. Real-Time Alerting & Intelligence
+Aegis integrates with external communication platforms to ensure rapid response.
+-   **Instant Notifications**: Webhook integration for Discord, Slack, or custom C2 interfaces.
+-   **Intelligent Gating**: Filters false positives using Motion Vectors before running heavy AI inference.
+-   **Metadata**: Alerts include confidence scores, object labels, and snapshot links.
+
+### 4. Forensic Data Retention
+All operational data is persisted for post-incident analysis.
+-   **SQLite Backend**: High-performance, server-side database tracks every detection event (`sentinel.db`).
+-   **Evidence Locker**: Full-resolution snapshots are stored and indexed by timestamp and track ID.
+-   **Investigation Dashboard**: A dedicated interface for reviewing, filtering, and analyzing historical alerts.
+
+### 5. "Digital Twin" Configuration
+The operational environment is defined in `config/site_manifest.yaml`, serving as the **Single Source of Truth**.
+-   **Schema**: Defines Assets, Spatial Data, and Network parameters.
+-   **Dynamic**: The system parses this manifest to generate the monitoring layout dynamically.
 
 ---
 
@@ -76,11 +89,12 @@ The C2 Dashboard visualizes threats using standard tactical cues:
 -   Python 3.10+
 -   Webcam (for Edge Node)
 -   Linux / macOS
+-   FFmpeg (for HLS recording)
 
 ### Installation
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/sentinel.git
+git clone https://github.com/2vyy/sentinel.git
 cd sentinel
 
 # Install dependencies
@@ -88,17 +102,17 @@ pip install -r requirements.txt
 ```
 
 ### Running the Platform
-Sentinel includes a master script `run.sh` to launch both the C2 Server and the Edge Node.
+The platform includes a master script `run.sh` to launch both the Central Server and the Edge Node.
 
 ```bash
 # Run both Server and Camera (Full Stack)
 ./run.sh
 
-# Run only the Server (Command Post)
+# Run only the Server (Central Hub)
 # Access UI at http://localhost:8000
 ./run.sh --server
 
-# Run only the Camera (Edge Sensor)
+# Run only the Camera (Edge Device)
 ./run.sh --camera
 ```
 
@@ -106,10 +120,17 @@ Sentinel includes a master script `run.sh` to launch both the C2 Server and the 
 
 ## Configuration
 
-Modify `config/site_manifest.yaml` to match your physical deployment:
+Modify `config/site_manifest.yaml` to match your deployment:
 
 ```yaml
-site_name: "FOB_BRAVO"
+site_name: "SITE_ALPHA"
+maps:
+  - id: "global"
+    name: "Global Ops"
+    type: "geospatial"
+    center: [34.0522, -118.2437]
+    zoom: 18
+
 assets:
   - id: "CAM_01"
     connection: { ip: "0.0.0.0", protocol: "webrtc" }
@@ -118,6 +139,7 @@ assets:
       lon: -118.2437
       heading: 0      # 0 = North
       fov: 90         # Wide angle
+    map_id: "global"
 ```
 
 ## Project Structure
@@ -125,12 +147,13 @@ assets:
 ```
 Sentinel/
 ├── camera_node/            # Edge Logic (Producer)
-│   ├── main.py             # WebRTC Signaling & DDIL Logic
+│   ├── main.py             # WebRTC Signaling & Connection Logic
 │   └── stream_manager.py   # Atomic Frame Capture
-├── server_node/            # C2 Logic (Consumer)
-│   ├── core/               # Intelligence Stack (YOLO, CoT, AssetMgr)
-│   ├── webrtc/             # Video Receiver & Leaky Bucket
-│   └── web/                # NiceGUI Frontend (Map, Video, Logs)
+├── server_node/            # Server Logic (Consumer)
+│   ├── core/               # Analytics Stack (YOLO, SQLite, AssetMgr)
+│   ├── webrtc/             # Video Receiver & HLS Recorder
+│   └── web/                # NiceGUI Frontend (Map, Video, History)
 ├── config/                 # YAML Manifests
+├── assets/                 # Map Images & Static Resources
 └── run.sh                  # Application Orchestrator
 ```
