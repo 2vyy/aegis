@@ -4,7 +4,7 @@
 
 ## Overview
 
-**Aegis** (repo: `sentinel`) is a modular monitoring architecture designed to bridge the gap between commercial IoT hardware and enterprise-grade centralized systems. Built for **resilience in unstable network conditions**, it decouples **Perception** (Edge Nodes) from **Cognition** (Central Server) to ensure continuous operation.
+**Aegis** is a modular monitoring architecture designed to bridge the gap between commercial IoT hardware and enterprise-grade centralized systems. Built for **resilience in unstable network conditions**, it decouples **Perception** (Edge Nodes) from **Cognition** (Central Server) to ensure continuous operation.
 
 It enables sub-200ms video streaming, edge-computed Automated Object Recognition, and seamless data aggregation. Aegis is designed for industrial safety, remote infrastructure monitoring, and high-availability observational contexts.
 
@@ -15,7 +15,7 @@ It enables sub-200ms video streaming, edge-computed Automated Object Recognition
 Aegis utilizes a **Split-Plane Architecture** to optimize network throughput. 
 * **Data Plane (UDP):** High-volume video traffic uses WebRTC to minimize latency.
 * **Control Plane (TCP):** Critical telemetry and hardware commands use reliable REST/WebSockets.
-
+ 
 ```mermaid
 graph TD
     subgraph Edge_Site [Edge Device / Camera Node]
@@ -72,7 +72,7 @@ Aegis integrates with external communication platforms to ensure rapid response.
 
 ### 4. Forensic Data Retention
 All operational data is persisted for post-incident analysis.
--   **SQLite Backend**: High-performance, server-side database tracks every detection event (`sentinel.db`).
+-   **SQLite Backend**: High-performance, server-side database tracks every detection event (`aegis.db`).
 -   **Evidence Locker**: Full-resolution snapshots are stored and indexed by timestamp and track ID.
 -   **Investigation Dashboard**: A dedicated interface for reviewing, filtering, and analyzing historical alerts.
 
@@ -94,8 +94,8 @@ The operational environment is defined in `config/site_manifest.yaml`, serving a
 ### Installation
 ```bash
 # Clone the repository
-git clone https://github.com/2vyy/sentinel.git
-cd sentinel
+git clone https://github.com/2vyy/aegis.git
+cd aegis
 
 # Install dependencies
 pip install -r requirements.txt
@@ -145,7 +145,7 @@ assets:
 ## Project Structure
 
 ```
-Sentinel/
+Aegis/
 ├── camera_node/            # Edge Logic (Producer)
 │   ├── main.py             # WebRTC Signaling & Connection Logic
 │   └── stream_manager.py   # Atomic Frame Capture
