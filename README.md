@@ -1,7 +1,5 @@
 # Aegis: Distributed Real-Time Monitoring Platform
 
-**A distributed microservices system for real-time operational visibility in bandwidth-constrained edge environments.**
-
 ## Overview
 
 **Aegis** is a modular monitoring architecture designed to bridge the gap between commercial IoT hardware and enterprise-grade centralized systems. Built for **resilience in unstable network conditions**, it decouples **Perception** (Edge Nodes) from **Cognition** (Central Server) to ensure continuous operation.
